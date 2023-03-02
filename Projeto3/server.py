@@ -49,7 +49,7 @@ def main():
         print(rxBuffer, rxBuffer[-1], 1)
         if rxBuffer == b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\t':
             print("Handshake realizado com sucesso")
-
+            com1.sendData(np.asarray(rxBuffer))
             comandos = []
 
             rxBuffer, nRx = com1.getData(1) # Recebe o tamanho do primeiro comando
