@@ -13,6 +13,7 @@
 from enlace import *
 import time
 import numpy as np
+import sys
 
 # voce deverá descomentar e configurar a porta com através da qual ira fazer comunicaçao
 #   para saber a sua porta, execute no terminal :
@@ -45,47 +46,64 @@ def main():
         com1.rx.clearBuffer() # Limpa o buffer de recebimento para receber os comandos
         time.sleep(0.1)
 
+        eop = b'\x01\x02\x03'
         rxBuffer, nRx = com1.getData(12)
-        print(rxBuffer, rxBuffer[-1], 1)
         if rxBuffer == b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\t':
-            print("Handshake realizado com sucesso")
-            com1.sendData(np.asarray(rxBuffer))
-            comandos = []
+            rxHandshake = rxBuffer
+            rxBuffer, nRx = com1.getData(3)
+            if rxBuffer == eop:
+                print("Handshake realizado com sucesso")
+                com1.sendData(np.asarray(rxHandshake))
+                comandos = []
 
-            rxBuffer, nRx = com1.getData(1) # Recebe o tamanho do primeiro comando
+                # rxBuffer, nRx = com1.getData(1) # Recebe o tamanho do primeiro comando
 
-            #Loop para receber os comandos do client
-            con = True
-            while con:
+                #Loop para receber os comandos do client
+                con = True
+                pacote_atual = 0
+                while con:
 
-                print('começando o loop')
+                    print('começando o loop')
 
-                if rxBuffer[0] == 17: #b'\x11' - byte de finalização
-                    print('')
-                    print("________________Finalizando comunicação________________")
-                    print('')
+                    if rxBuffer[0] == 17: #b'\x11' - byte de finalização
+                        print('')
+                        print("________________Finalizando comunicação________________")
+                        print('')
 
-                    txBuffer = len(comandos).to_bytes(1, byteorder='big')
-                    print(txBuffer)
-                    #print(f'O tamanho do array é {len(txBuffer)}')
+                        txBuffer = len(comandos).to_bytes(1, byteorder='big')
+                        print(txBuffer)
+                        #print(f'O tamanho do array é {len(txBuffer)}')
 
-                    txSize = com1.tx.getStatus()
-                    com1.sendData(np.asarray(txBuffer))
-                    print(f'Server enviou {txBuffer.to_bytes(1, byteorder="big")} comandos')
-                    #print(f'Server enviou {txSize} bytes')
+                        txSize = com1.tx.getStatus()
+                        com1.sendData(np.asarray(txBuffer))
+                        print(f'Server enviou {txBuffer.to_bytes(1, byteorder="big")} comandos')
+                        #print(f'Server enviou {txSize} bytes')
 
-                    # Encerra comunicação
-                    print("-------------------------")
-                    print("Comunicação encerrada")
-                    print("-------------------------")
-                    com1.disable()
-                    con = False
+                        # Encerra comunicação
+                        print("-------------------------")
+                        print("Comunicação encerrada")
+                        print("-------------------------")
+                        com1.disable()
+                        con = False
 
-                else:
-                    rxBuffer, nRx = com1.getData(rxBuffer[0]) # Recebe o tamanho do próximo comando
-                    print(f'Server recebeu o comando {rxBuffer}')
-                    comandos.append(rxBuffer)
-                    rxBuffer, nRx = com1.getData(1) # Atualiza o rxBuffer para receber o próximo comando ou finalizar a comunicação
+                    else:
+                        rxBuffer, nRx = com1.getData(12) # Recebe o head
+                        #print(int.from_bytes(rxBuffer[0], byteorder='big'))
+                        print(rxBuffer)
+                        print(rxBuffer[0], 'aaaaaa')
+                        if rxBuffer[0] == pacote_atual+1:
+                            pacote_atual = rxBuffer[0]
+                            print(f'Server recebeu o comando {rxBuffer}')
+                            rxBuffer, nRx = com1.getData(rxBuffer[2])
+                            comandos.append(rxBuffer)
+                            rxBuffer, nRx = com1.getData(3) # Atualiza o rxBuffer para receber o próximo comando ou finalizar a comunicação
+                        else:
+                            print('pocote pulado')
+                            com1.disable()
+                            break
+            else:
+                print("Handshake não realizado")
+                com1.disable()
         else:
             print("Handshake não realizado")
             com1.disable()
